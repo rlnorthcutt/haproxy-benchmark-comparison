@@ -61,6 +61,14 @@ services:
     ports:
       - "8081:80"
 
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:0.11.0
+    container_name: benchmark-nginx-exporter
+    command:
+      - --nginx.scrape-uri=http://benchmark-nginx/nginx_status
+    depends_on:
+      - nginx
+
   haproxy:
     image: haproxy:3.0-alpine
     container_name: benchmark-haproxy
@@ -80,6 +88,11 @@ services:
       - --entryPoints.web.address=:80
       - --accesslog=false
       - --log.level=ERROR
+      - --metrics.prometheus=true
+      - --metrics.prometheus.addEntryPointsLabels=true
+      - --metrics.prometheus.addRoutersLabels=true
+      - --metrics.prometheus.entryPoint=metrics
+      - --entryPoints.metrics.address=:9100
     volumes:
       - ./traefik/local.yaml:/etc/traefik/dynamic.yaml:ro
     depends_on:
@@ -87,6 +100,49 @@ services:
       - ntex-app-2
     ports:
       - "8083:80"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: benchmark-cadvisor
+    command:
+      - --docker_only
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: benchmark-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    depends_on:
+      - cadvisor
+      - haproxy
+      - nginx-exporter
+      - traefik
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: benchmark-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./dashboard.json:/var/lib/grafana/dashboards/load-balancer-benchmark.json:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
 
 networks:
   default:

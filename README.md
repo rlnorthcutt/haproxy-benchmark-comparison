@@ -33,6 +33,27 @@ after the test. All additional arguments are forwarded to
 ./scripts/run-benchmark.sh --no-teardown -- --dry-run
 ```
 
+## Live monitoring with Grafana and Prometheus
+
+When the stack is running you can explore live metrics for each load balancer
+using the bundled Prometheus and Grafana services:
+
+* **Prometheus** – <http://localhost:9090>
+* **Grafana** – <http://localhost:3000> (default credentials `admin/admin`)
+
+Grafana automatically provisions the included dashboard at
+`dashboards/Load Balancer Benchmark`, which visualises CPU, memory, request
+rate, and connection metrics for Nginx, HAProxy, and Traefik. The dashboard is
+fed by:
+
+* `nginx/nginx-prometheus-exporter` scraping the Nginx `stub_status` endpoint.
+* HAProxy's built-in Prometheus exporter (exposed on port `8404`).
+* Traefik's native Prometheus metrics endpoint.
+* `cAdvisor` for container-level CPU and memory usage.
+
+Keep the containers alive with `--no-teardown` while the benchmark runs, then
+open Grafana to watch the traffic in real time or to analyse a completed run.
+
 ## Customising the benchmark
 
 Update `benchmark/config.toml` to tweak the concurrency ramp, timing, or target
