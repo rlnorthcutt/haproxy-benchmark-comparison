@@ -1,0 +1,14 @@
+http:
+  routers:
+    ntex:
+      rule: "PathPrefix(`/`)"
+      service: ntex
+      entryPoints:
+        - web
+  services:
+    ntex:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://benchmark-ntex-app-1:8080
+          - url: http://benchmark-ntex-app-2:8080

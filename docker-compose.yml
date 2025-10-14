@@ -1,0 +1,93 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: benchmark-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ntexdb
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  ntex-app-1:
+    build:
+      context: ./ntex-app
+      dockerfile: Dockerfile
+    container_name: benchmark-ntex-app-1
+    environment:
+      HTTP_PORT: "8080"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PWD: password
+      POSTGRES_DB: ntexdb
+      POSTGRES_POOL: "16"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ntex-app-2:
+    build:
+      context: ./ntex-app
+      dockerfile: Dockerfile
+    container_name: benchmark-ntex-app-2
+    environment:
+      HTTP_PORT: "8080"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PWD: password
+      POSTGRES_DB: ntexdb
+      POSTGRES_POOL: "16"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: benchmark-nginx
+    volumes:
+      - ./nginx/local.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - ntex-app-1
+      - ntex-app-2
+    ports:
+      - "8081:80"
+
+  haproxy:
+    image: haproxy:3.0-alpine
+    container_name: benchmark-haproxy
+    volumes:
+      - ./haproxy/local.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - ntex-app-1
+      - ntex-app-2
+    ports:
+      - "8082:80"
+
+  traefik:
+    image: traefik:3.1
+    container_name: benchmark-traefik
+    command:
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      - --entryPoints.web.address=:80
+      - --accesslog=false
+      - --log.level=ERROR
+    volumes:
+      - ./traefik/local.yaml:/etc/traefik/dynamic.yaml:ro
+    depends_on:
+      - ntex-app-1
+      - ntex-app-2
+    ports:
+      - "8083:80"
+
+networks:
+  default:
+    name: benchmark

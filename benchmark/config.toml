@@ -1,0 +1,21 @@
+[test]
+request = "GET"
+protocol = "http"
+min_clients = 10
+max_clients = 200
+stage_interval_s = 15
+request_delay_ms = 80
+request_timeout_ms = 1000
+stage_count = 6
+
+[[targets]]
+name = "nginx"
+url = "http://localhost:8081/api/devices"
+
+[[targets]]
+name = "haproxy"
+url = "http://localhost:8082/api/devices"
+
+[[targets]]
+name = "traefik"
+url = "http://localhost:8083/api/devices"
